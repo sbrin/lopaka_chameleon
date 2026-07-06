@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-label="Garden path background">
+  <rect width="1280" height="720" fill="#d7ecf7"/>
+  <rect y="340" width="1280" height="380" fill="#86b66a"/>
+  <circle cx="1060" cy="110" r="72" fill="#ffd66b"/>
+  <path d="M520 720C570 610 600 500 620 340h120c20 160 50 270 100 380z" fill="#d8c4a4"/>
+  <path d="M600 340c-10 140-40 260-80 380" fill="none" stroke="#b9a383" stroke-width="12"/>
+  <path d="M740 340c10 140 40 260 80 380" fill="none" stroke="#b9a383" stroke-width="12"/>
+  <rect x="0" y="320" width="1280" height="34" fill="#5e8d51"/>
+  <circle cx="140" cy="330" r="130" fill="#4f8a45"/>
+  <circle cx="300" cy="310" r="105" fill="#679f55"/>
+  <circle cx="1110" cy="325" r="145" fill="#4f8a45"/>
+  <circle cx="950" cy="300" r="95" fill="#6ba65a"/>
+  <rect x="96" y="315" width="52" height="135" rx="18" fill="#7c5f42"/>
+  <rect x="1086" y="310" width="58" height="150" rx="20" fill="#7c5f42"/>
+  <ellipse cx="250" cy="560" rx="115" ry="32" fill="#6aa256"/>
+  <ellipse cx="1010" cy="565" rx="130" ry="36" fill="#6aa256"/>
+  <circle cx="290" cy="520" r="14" fill="#f4b6c2"/>
+  <circle cx="980" cy="520" r="16" fill="#f6d08f"/>
+  <circle cx="1040" cy="545" r="13" fill="#f4b6c2"/>
+</svg>
