@@ -1,0 +1,21 @@
+{
+  "name": "lopaka-chameleon-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-06",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lopaka_chameleon",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "LEVEL_BUCKET",
+      "bucket_name": "lopaka-chameleon-levels"
+    }
+  ],
+  "vars": {
+    "SCENE_PUBLIC_BASE_URL": "http://localhost:8787/assets"
+  }
+}
