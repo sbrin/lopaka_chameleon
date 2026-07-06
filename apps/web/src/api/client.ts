@@ -1,10 +1,11 @@
-import type { BackgroundAsset, PoseAsset } from "@lopaka/assets";
 import type {
   AnonymousSession,
+  BackgroundAsset,
   CreateLevelInput,
   GuessInput,
   GuessResult,
   LevelSummary,
+  PoseAsset,
   SessionStore,
 } from "@lopaka/game-core";
 

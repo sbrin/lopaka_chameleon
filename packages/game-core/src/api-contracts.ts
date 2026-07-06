@@ -1,6 +1,22 @@
 export type SessionId = string;
 export type LevelId = string;
 
+export type BackgroundAsset = {
+  id: string;
+  name: string;
+  src: string;
+  width: number;
+  height: number;
+};
+
+export type PoseAsset = {
+  id: string;
+  name: string;
+  modelSrc: string;
+  defaultRotation: number;
+  fixedDisplayHeightRatio: number;
+};
+
 export type AnonymousSession = {
   id: SessionId;
   createdAt: string;
