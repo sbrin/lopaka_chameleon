@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "jsx": "react-jsx",
+    "outDir": "dist",
+    "rootDir": ".",
+    "types": ["vite/client"]
+  },
+  "include": ["src", "test", "vite.config.ts", "vitest.config.ts"],
+  "references": [
+    { "path": "../../packages/assets" },
+    { "path": "../../packages/game-core" },
+    { "path": "../../packages/rendering-web" }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/game-core" },
+    { "path": "packages/assets" },
+    { "path": "packages/rendering-web" },
+    { "path": "apps/api" },
+    { "path": "apps/web" }
+  ]
+}

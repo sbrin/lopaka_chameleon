@@ -1,0 +1,25 @@
+{
+  "name": "@lopaka/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -b",
+    "build": "vite build",
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@lopaka/assets": "workspace:*",
+    "@lopaka/game-core": "workspace:*",
+    "@lopaka/rendering-web": "workspace:*",
+    "@vitejs/plugin-react": "^5.0.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "three": "^0.178.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}
