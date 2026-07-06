@@ -1,3 +1,5 @@
+import { decode as decodePng } from "fast-png";
+
 import type { MaskBitmap } from "../services/hit-test-service";
 
 export interface ObjectStore {
@@ -6,30 +8,26 @@ export interface ObjectStore {
   getMask(objectKey: string): Promise<MaskBitmap>;
 }
 
-type JsonMask = {
-  width: number;
-  height: number;
-  alpha: number[];
-};
-
-const parseJsonMask = async (body: R2ObjectBody): Promise<MaskBitmap> => {
-  const mask = (await body.json()) as JsonMask;
+const decodePngMask = async (body: R2ObjectBody): Promise<MaskBitmap> => {
+  const png = decodePng(await body.arrayBuffer());
+  const { width, height, channels, data } = png;
+  const alphaChannelIndex = channels === 4 ? 3 : channels === 2 ? 1 : -1;
 
   if (
-    !Number.isInteger(mask.width) ||
-    mask.width <= 0 ||
-    !Number.isInteger(mask.height) ||
-    mask.height <= 0 ||
-    !Array.isArray(mask.alpha) ||
-    mask.alpha.length !== mask.width * mask.height
+    !Number.isInteger(width) ||
+    width <= 0 ||
+    !Number.isInteger(height) ||
+    height <= 0 ||
+    alphaChannelIndex < 0 ||
+    data.length < width * height * channels
   ) {
-    throw new Error("Invalid mask object.");
+    throw new Error("Invalid mask PNG.");
   }
 
   return {
-    width: mask.width,
-    height: mask.height,
-    alphaAt: (x: number, y: number) => mask.alpha[y * mask.width + x] ?? 0,
+    width,
+    height,
+    alphaAt: (x: number, y: number) => data[(y * width + x) * channels + alphaChannelIndex] ?? 0,
   };
 };
 
@@ -63,6 +61,6 @@ export class R2ObjectStore implements ObjectStore {
       throw new Error("Mask object not found.");
     }
 
-    return parseJsonMask(object);
+    return decodePngMask(object);
   }
 }

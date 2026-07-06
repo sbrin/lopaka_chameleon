@@ -44,6 +44,8 @@ const requireSession = async (sessionId: string | undefined, sessions: SessionRe
 const isImageFile = (value: FormDataEntryValue | null): value is File =>
   value instanceof File && value.type.startsWith("image/");
 
+const isPngFile = (value: FormDataEntryValue | null): value is File => value instanceof File && value.type === "image/png";
+
 const parseCreateLevelInput = (value: FormDataEntryValue | null): CreateLevelInput | null => {
   if (typeof value !== "string") return null;
 
@@ -159,7 +161,7 @@ export function levelsRoutes(dependencies: LevelRouteDependencies = {}) {
     const mask = form.get("mask");
     const metadata = parseCreateLevelInput(form.get("metadata"));
 
-    if (!isImageFile(scene) || !isImageFile(mask) || !metadata) {
+    if (!isImageFile(scene) || !isPngFile(mask) || !metadata) {
       return c.json(jsonError("Invalid level upload."), 400);
     }
 

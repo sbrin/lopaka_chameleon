@@ -1,0 +1,77 @@
+import { encode as encodePng } from "fast-png";
+import { describe, expect, it } from "vitest";
+
+import { R2ObjectStore } from "../src/repositories/r2-object-store";
+
+const rgbaPngFixture =
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4XmP4zwAE/8EUkPz/vwEANlwHesZDrpkAAAAASUVORK5CYII=";
+
+const decodeBase64 = (value: string): Uint8Array => {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
+};
+
+class FakeR2ObjectBody {
+  constructor(private readonly bytes: Uint8Array) {}
+
+  async arrayBuffer(): Promise<ArrayBuffer> {
+    return this.bytes.slice().buffer;
+  }
+}
+
+class FakeR2Bucket {
+  constructor(private readonly objects: Map<string, Uint8Array>) {}
+
+  async get(key: string): Promise<R2ObjectBody | null> {
+    const bytes = this.objects.get(key);
+    return bytes ? (new FakeR2ObjectBody(bytes) as unknown as R2ObjectBody) : null;
+  }
+}
+
+const makeStore = (objects: Map<string, Uint8Array>) =>
+  new R2ObjectStore(new FakeR2Bucket(objects) as unknown as R2Bucket, "https://cdn.example.test");
+
+describe("R2ObjectStore", () => {
+  it("decodes uploaded RGBA PNG masks from R2 bytes", async () => {
+    const store = makeStore(new Map([["masks/rgba.png", decodeBase64(rgbaPngFixture)]]));
+
+    const mask = await store.getMask("masks/rgba.png");
+
+    expect(mask.width).toBe(2);
+    expect(mask.height).toBe(2);
+    expect(mask.alphaAt(0, 0)).toBe(0);
+    expect(mask.alphaAt(1, 0)).toBe(255);
+    expect(mask.alphaAt(0, 1)).toBe(0);
+    expect(mask.alphaAt(1, 1)).toBe(128);
+  });
+
+  it("decodes grayscale-alpha PNG masks from R2 bytes", async () => {
+    const grayAlphaPng = encodePng({
+      width: 2,
+      height: 1,
+      channels: 2,
+      depth: 8,
+      data: new Uint8Array([0, 0, 255, 200]),
+    });
+    const store = makeStore(new Map([["masks/gray-alpha.png", grayAlphaPng]]));
+
+    const mask = await store.getMask("masks/gray-alpha.png");
+
+    expect(mask.width).toBe(2);
+    expect(mask.height).toBe(1);
+    expect(mask.alphaAt(0, 0)).toBe(0);
+    expect(mask.alphaAt(1, 0)).toBe(200);
+  });
+
+  it("throws when a mask object is missing", async () => {
+    const store = makeStore(new Map());
+
+    await expect(store.getMask("masks/missing.png")).rejects.toThrow("Mask object not found.");
+  });
+});

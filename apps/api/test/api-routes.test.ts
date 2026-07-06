@@ -188,7 +188,7 @@ describe("API routes", () => {
     const { app, env, sessions, levels, objects } = makeApp();
     await sessions.createOrRefresh("session-creator");
     const form = new FormData();
-    form.set("scene", new File(["scene"], "scene.png", { type: "image/png" }));
+    form.set("scene", new File(["scene"], "scene.webp", { type: "image/webp" }));
     form.set("mask", new File(["mask"], "mask.png", { type: "image/png" }));
     form.set(
       "metadata",
@@ -210,6 +210,8 @@ describe("API routes", () => {
 
     expect(response.status).toBe(201);
     expect(objects.puts.map((put) => put.kind)).toEqual(["scene", "mask"]);
+    expect(objects.puts[0]?.file.type).toBe("image/webp");
+    expect(objects.puts[1]?.file.type).toBe("image/png");
     const sceneObjectKey = "scenes/" + objects.puts[0]?.levelId + ".png";
     const maskObjectKey = "masks/" + objects.puts[1]?.levelId + ".png";
     expect(levels.created).toEqual([
@@ -253,6 +255,33 @@ describe("API routes", () => {
     }, env);
 
     expect(response.status).toBe(400);
+  });
+
+  it("rejects non-PNG mask uploads before storing objects", async () => {
+    const { app, env, sessions, objects } = makeApp();
+    await sessions.createOrRefresh("session-creator");
+    const form = new FormData();
+    form.set("scene", new File(["scene"], "scene.webp", { type: "image/webp" }));
+    form.set("mask", new File(["mask"], "mask.webp", { type: "image/webp" }));
+    form.set(
+      "metadata",
+      JSON.stringify({
+        backgroundId: "studio-desk",
+        poseId: "og-standing",
+        rotation: 0,
+        imageWidth: 640,
+        imageHeight: 480,
+      }),
+    );
+
+    const response = await app.request("/api/levels", {
+      method: "POST",
+      headers: { "x-lopaka-session-id": "session-creator" },
+      body: form,
+    }, env);
+
+    expect(response.status).toBe(400);
+    expect(objects.puts).toEqual([]);
   });
 
   it("records guesses using the private mask object without exposing private fields", async () => {
