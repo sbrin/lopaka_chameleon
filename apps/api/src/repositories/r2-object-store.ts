@@ -9,7 +9,17 @@ export interface ObjectStore {
 }
 
 const decodePngMask = async (body: R2ObjectBody): Promise<MaskBitmap> => {
-  const png = decodePng(await body.arrayBuffer());
+  return decodePngMaskBytes(await body.arrayBuffer());
+};
+
+const decodePngMaskBytes = (bytes: ArrayBuffer): MaskBitmap => {
+  let png: ReturnType<typeof decodePng>;
+  try {
+    png = decodePng(bytes);
+  } catch {
+    throw new Error("Invalid mask PNG.");
+  }
+
   const { width, height, channels, data } = png;
   const alphaChannelIndex = channels === 4 ? 3 : channels === 2 ? 1 : -1;
 
@@ -29,6 +39,15 @@ const decodePngMask = async (body: R2ObjectBody): Promise<MaskBitmap> => {
     height,
     alphaAt: (x: number, y: number) => data[(y * width + x) * channels + alphaChannelIndex] ?? 0,
   };
+};
+
+export const isSupportedMaskPngFile = async (file: File): Promise<boolean> => {
+  try {
+    decodePngMaskBytes(await file.arrayBuffer());
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 export class R2ObjectStore implements ObjectStore {

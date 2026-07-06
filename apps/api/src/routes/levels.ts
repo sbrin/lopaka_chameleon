@@ -4,7 +4,7 @@ import { Hono } from "hono";
 
 import type { Env } from "../bindings";
 import { D1LevelRepository } from "../repositories/d1-level-repository";
-import { R2ObjectStore, type ObjectStore } from "../repositories/r2-object-store";
+import { R2ObjectStore, isSupportedMaskPngFile, type ObjectStore } from "../repositories/r2-object-store";
 import type { LevelRepository, SessionRepository } from "../repositories/types";
 import { D1SessionRepository } from "../repositories/d1-session-repository";
 import { isMaskHit } from "../services/hit-test-service";
@@ -162,6 +162,10 @@ export function levelsRoutes(dependencies: LevelRouteDependencies = {}) {
     const metadata = parseCreateLevelInput(form.get("metadata"));
 
     if (!isImageFile(scene) || !isPngFile(mask) || !metadata) {
+      return c.json(jsonError("Invalid level upload."), 400);
+    }
+
+    if (!(await isSupportedMaskPngFile(mask))) {
       return c.json(jsonError("Invalid level upload."), 400);
     }
 

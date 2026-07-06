@@ -7,6 +7,26 @@ import type { Env } from "../src/bindings";
 import type { AnonymousSession, LevelSummary } from "@lopaka/game-core";
 import type { MaskBitmap } from "../src/services/hit-test-service";
 
+const rgbaPngFixture =
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4XmP4zwAE/8EUkPz/vwEANlwHesZDrpkAAAAASUVORK5CYII=";
+
+const decodeBase64 = (value: string): Uint8Array => {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
+};
+
+const blobPartFromBytes = (bytes: Uint8Array): ArrayBuffer => {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+};
+
 class FakeSessionRepository implements SessionRepository {
   readonly sessions = new Set<string>();
 
@@ -189,7 +209,7 @@ describe("API routes", () => {
     await sessions.createOrRefresh("session-creator");
     const form = new FormData();
     form.set("scene", new File(["scene"], "scene.webp", { type: "image/webp" }));
-    form.set("mask", new File(["mask"], "mask.png", { type: "image/png" }));
+    form.set("mask", new File([blobPartFromBytes(decodeBase64(rgbaPngFixture))], "mask.png", { type: "image/png" }));
     form.set(
       "metadata",
       JSON.stringify({
@@ -282,6 +302,34 @@ describe("API routes", () => {
 
     expect(response.status).toBe(400);
     expect(objects.puts).toEqual([]);
+  });
+
+  it("rejects malformed PNG mask uploads before storing objects or creating level metadata", async () => {
+    const { app, env, sessions, levels, objects } = makeApp();
+    await sessions.createOrRefresh("session-creator");
+    const form = new FormData();
+    form.set("scene", new File(["scene"], "scene.webp", { type: "image/webp" }));
+    form.set("mask", new File(["not a png"], "mask.png", { type: "image/png" }));
+    form.set(
+      "metadata",
+      JSON.stringify({
+        backgroundId: "studio-desk",
+        poseId: "og-standing",
+        rotation: 0,
+        imageWidth: 640,
+        imageHeight: 480,
+      }),
+    );
+
+    const response = await app.request("/api/levels", {
+      method: "POST",
+      headers: { "x-lopaka-session-id": "session-creator" },
+      body: form,
+    }, env);
+
+    expect(response.status).toBe(400);
+    expect(objects.puts).toEqual([]);
+    expect(levels.created).toEqual([]);
   });
 
   it("records guesses using the private mask object without exposing private fields", async () => {

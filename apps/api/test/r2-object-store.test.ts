@@ -1,7 +1,7 @@
 import { encode as encodePng } from "fast-png";
 import { describe, expect, it } from "vitest";
 
-import { R2ObjectStore } from "../src/repositories/r2-object-store";
+import { R2ObjectStore, isSupportedMaskPngFile } from "../src/repositories/r2-object-store";
 
 const rgbaPngFixture =
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4XmP4zwAE/8EUkPz/vwEANlwHesZDrpkAAAAASUVORK5CYII=";
@@ -15,6 +15,12 @@ const decodeBase64 = (value: string): Uint8Array => {
   }
 
   return bytes;
+};
+
+const blobPartFromBytes = (bytes: Uint8Array): ArrayBuffer => {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
 };
 
 class FakeR2ObjectBody {
@@ -38,6 +44,44 @@ const makeStore = (objects: Map<string, Uint8Array>) =>
   new R2ObjectStore(new FakeR2Bucket(objects) as unknown as R2Bucket, "https://cdn.example.test");
 
 describe("R2ObjectStore", () => {
+  it("accepts uploaded RGBA PNG mask files", async () => {
+    const file = new File([blobPartFromBytes(decodeBase64(rgbaPngFixture))], "mask.png", { type: "image/png" });
+
+    await expect(isSupportedMaskPngFile(file)).resolves.toBe(true);
+  });
+
+  it("accepts uploaded grayscale-alpha PNG mask files", async () => {
+    const grayAlphaPng = encodePng({
+      width: 2,
+      height: 1,
+      channels: 2,
+      depth: 8,
+      data: new Uint8Array([0, 0, 255, 200]),
+    });
+    const file = new File([blobPartFromBytes(grayAlphaPng)], "mask.png", { type: "image/png" });
+
+    await expect(isSupportedMaskPngFile(file)).resolves.toBe(true);
+  });
+
+  it("rejects uploaded mask files with malformed PNG bytes", async () => {
+    const file = new File(["not a png"], "mask.png", { type: "image/png" });
+
+    await expect(isSupportedMaskPngFile(file)).resolves.toBe(false);
+  });
+
+  it("rejects uploaded PNG masks without an alpha channel", async () => {
+    const rgbPng = encodePng({
+      width: 1,
+      height: 1,
+      channels: 3,
+      depth: 8,
+      data: new Uint8Array([255, 255, 255]),
+    });
+    const file = new File([blobPartFromBytes(rgbPng)], "mask.png", { type: "image/png" });
+
+    await expect(isSupportedMaskPngFile(file)).resolves.toBe(false);
+  });
+
   it("decodes uploaded RGBA PNG masks from R2 bytes", async () => {
     const store = makeStore(new Map([["masks/rgba.png", decodeBase64(rgbaPngFixture)]]));
 
