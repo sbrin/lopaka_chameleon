@@ -118,17 +118,30 @@ export class D1LevelRepository implements LevelRepository {
     const row = await this.db
       .prepare(
         `
-        select id, scene_object_key, image_width, image_height
+        select levels.id, levels.scene_object_key, levels.image_width, levels.image_height
         from levels
-        where status = 'published'
+        where levels.status = 'published'
+          and not exists (
+            select 1
+            from skips
+            where skips.level_id = levels.id
+              and skips.session_id = ?
+          )
+          and not exists (
+            select 1
+            from guesses
+            where guesses.level_id = levels.id
+              and guesses.session_id = ?
+              and guesses.hit = 1
+          )
         order by
-          case when creator_session_id <> ? then 0 else 1 end,
-          published_at asc,
-          created_at asc
+          case when levels.creator_session_id <> ? then 0 else 1 end,
+          levels.published_at asc,
+          levels.created_at asc
         limit 1
         `,
       )
-      .bind(sessionId)
+      .bind(sessionId, sessionId, sessionId)
       .first<LevelSummaryRow>();
 
     return row ? mapLevelSummary(row) : null;

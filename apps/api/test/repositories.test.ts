@@ -117,6 +117,17 @@ const readMigrationSql = async (): Promise<string> => {
   return fs.readFileSync(new URL("../../../infra/cloudflare/migrations/0001_initial.sql", import.meta.url), "utf8");
 };
 
+const levelInput = (creatorSessionId: string, name: string): NewLevelRecord => ({
+  creatorSessionId,
+  backgroundId: `background-${name}`,
+  poseId: `pose-${name}`,
+  rotation: 0,
+  imageWidth: 800,
+  imageHeight: 600,
+  sceneObjectKey: `scenes/${name}.png`,
+  maskObjectKey: `masks/${name}.png`,
+});
+
 describe("D1 repositories", () => {
   let db: TestD1Database;
   let sessions: D1SessionRepository;
@@ -126,6 +137,7 @@ describe("D1 repositories", () => {
     const Database = await loadSqliteDatabase();
     const sqlite = new Database(":memory:");
     const migration = await readMigrationSql();
+    sqlite.exec("PRAGMA foreign_keys = ON");
     sqlite.exec(migration);
     db = new TestD1Database(sqlite);
     sessions = new D1SessionRepository(db as unknown as D1Database);
@@ -238,5 +250,106 @@ describe("D1 repositories", () => {
       session_id: otherSession.id,
       elapsed_ms: 2500,
     });
+  });
+
+  it("does not return levels skipped by the requesting session", async () => {
+    const player = await sessions.createOrRefresh("session-player");
+    const creatorA = await sessions.createOrRefresh("session-creator-a");
+    const creatorB = await sessions.createOrRefresh("session-creator-b");
+    const skippedLevel = await levels.createLevel(levelInput(creatorA.id, "skipped"));
+    const nextLevel = await levels.createLevel(levelInput(creatorB.id, "available"));
+
+    await levels.recordSkip({
+      levelId: skippedLevel.id,
+      sessionId: player.id,
+      elapsedMs: 1200,
+    });
+
+    const next = await levels.getNextLevel(player.id);
+
+    expect(next?.levelId).toBe(nextLevel.id);
+  });
+
+  it("does not return levels with successful guesses by the requesting session", async () => {
+    const player = await sessions.createOrRefresh("session-player");
+    const creatorA = await sessions.createOrRefresh("session-creator-a");
+    const creatorB = await sessions.createOrRefresh("session-creator-b");
+    const hitLevel = await levels.createLevel(levelInput(creatorA.id, "hit"));
+    const nextLevel = await levels.createLevel(levelInput(creatorB.id, "available"));
+
+    await levels.recordGuess({
+      levelId: hitLevel.id,
+      sessionId: player.id,
+      x: 100,
+      y: 150,
+      elapsedMs: 900,
+      hit: true,
+    });
+
+    const next = await levels.getNextLevel(player.id);
+
+    expect(next?.levelId).toBe(nextLevel.id);
+  });
+
+  it("keeps missed levels eligible for the requesting session", async () => {
+    const player = await sessions.createOrRefresh("session-player");
+    const creator = await sessions.createOrRefresh("session-creator");
+    const missedLevel = await levels.createLevel(levelInput(creator.id, "missed"));
+
+    await levels.recordGuess({
+      levelId: missedLevel.id,
+      sessionId: player.id,
+      x: 100,
+      y: 150,
+      elapsedMs: 900,
+      hit: false,
+    });
+
+    const next = await levels.getNextLevel(player.id);
+
+    expect(next?.levelId).toBe(missedLevel.id);
+  });
+
+  it("returns an unconsumed creator-owned level when it is the only published option", async () => {
+    const player = await sessions.createOrRefresh("session-player");
+    const creator = await sessions.createOrRefresh("session-creator");
+    const consumedOtherLevel = await levels.createLevel(levelInput(creator.id, "consumed-other"));
+    const ownLevel = await levels.createLevel(levelInput(player.id, "own"));
+
+    await levels.recordGuess({
+      levelId: consumedOtherLevel.id,
+      sessionId: player.id,
+      x: 100,
+      y: 150,
+      elapsedMs: 900,
+      hit: true,
+    });
+
+    const next = await levels.getNextLevel(player.id);
+
+    expect(next?.levelId).toBe(ownLevel.id);
+  });
+
+  it("returns null when every published level is consumed by the requesting session", async () => {
+    const player = await sessions.createOrRefresh("session-player");
+    const creator = await sessions.createOrRefresh("session-creator");
+    const skippedLevel = await levels.createLevel(levelInput(creator.id, "skipped"));
+    const hitLevel = await levels.createLevel(levelInput(player.id, "hit-own"));
+
+    await levels.recordSkip({
+      levelId: skippedLevel.id,
+      sessionId: player.id,
+      elapsedMs: 1200,
+    });
+    await levels.recordGuess({
+      levelId: hitLevel.id,
+      sessionId: player.id,
+      x: 100,
+      y: 150,
+      elapsedMs: 900,
+      hit: true,
+    });
+
+    await expect(levels.getNextLevel(player.id)).resolves.toBeNull();
   });
 });
