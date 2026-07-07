@@ -3,7 +3,7 @@
 Build command:
 
 ```bash
-bun install && bun --cwd apps/web run build
+bun install && bun run --cwd apps/web build
 ```
 
 Build output directory:
