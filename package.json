@@ -12,7 +12,10 @@
     "dev:web": "bun run --cwd apps/web dev",
     "dev:api": "bun run --cwd apps/api dev",
     "build:web": "bun run --cwd apps/web build",
-    "build:api": "bun run --cwd apps/api build"
+    "build:api": "bun run --cwd apps/api build",
+    "db:migrate:local": "wrangler d1 migrations apply lopaka_chameleon --local --config apps/api/wrangler.jsonc",
+    "dev:api:cloudflare": "wrangler dev --config apps/api/wrangler.jsonc",
+    "deploy:api": "wrangler deploy --config apps/api/wrangler.jsonc"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260706.1",
