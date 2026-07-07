@@ -50,6 +50,19 @@ export const isSupportedMaskPngFile = async (file: File): Promise<boolean> => {
   }
 };
 
+const extensionForImage = (file: File): string => {
+  switch (file.type) {
+    case "image/jpeg":
+      return "jpg";
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    default:
+      return "bin";
+  }
+};
+
 export class R2ObjectStore implements ObjectStore {
   constructor(
     private readonly bucket: R2Bucket,
@@ -57,7 +70,7 @@ export class R2ObjectStore implements ObjectStore {
   ) {}
 
   async putLevelAsset(kind: "scene" | "mask", levelId: string, file: File): Promise<string> {
-    const extension = file.type === "image/jpeg" ? "jpg" : "png";
+    const extension = extensionForImage(file);
     const objectKey = `${kind}s/${levelId}.${extension}`;
 
     await this.bucket.put(objectKey, file.stream(), {

@@ -114,7 +114,7 @@ class FakeObjectStore implements ObjectStore {
 
   async putLevelAsset(kind: "scene" | "mask", levelId: string, file: File): Promise<string> {
     this.puts.push({ kind, levelId, file });
-    return `${kind}s/${levelId}.png`;
+    return `${kind}s/${levelId}.${kind === "scene" && file.type === "image/webp" ? "webp" : "png"}`;
   }
 
   getSceneUrl(objectKey: string): string {
@@ -123,6 +123,34 @@ class FakeObjectStore implements ObjectStore {
 
   async getMask(): Promise<MaskBitmap> {
     return this.mask;
+  }
+}
+
+class FakePublicR2Object {
+  readonly httpEtag = "\"scene-etag\"";
+
+  constructor(
+    private readonly content: string,
+    private readonly contentType: string,
+  ) {}
+
+  get body(): ReadableStream {
+    return new Blob([this.content], { type: this.contentType }).stream();
+  }
+
+  writeHttpMetadata(headers: Headers): void {
+    headers.set("content-type", this.contentType);
+  }
+}
+
+class FakePublicR2Bucket {
+  readonly requests: string[] = [];
+
+  constructor(private readonly objects: Map<string, FakePublicR2Object>) {}
+
+  async get(key: string): Promise<R2ObjectBody | null> {
+    this.requests.push(key);
+    return (this.objects.get(key) as unknown as R2ObjectBody | undefined) ?? null;
   }
 }
 
@@ -169,6 +197,24 @@ describe("API routes", () => {
       expect.arrayContaining([expect.objectContaining({ id: "studio-desk" })]),
     );
     await expect(posesResponse.json()).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ id: "og-standing" })]));
+  });
+
+  it("serves public scene assets without exposing mask assets", async () => {
+    const bucket = new FakePublicR2Bucket(
+      new Map([["scenes/level-public.webp", new FakePublicR2Object("scene-bytes", "image/webp")]]),
+    );
+    const env = { LEVEL_BUCKET: bucket } as unknown as Env;
+    const app = createApp();
+
+    const sceneResponse = await app.request("/assets/scenes/level-public.webp", {}, env);
+    const maskResponse = await app.request("/assets/masks/level-public.png", {}, env);
+
+    expect(sceneResponse.status).toBe(200);
+    expect(sceneResponse.headers.get("content-type")).toBe("image/webp");
+    expect(sceneResponse.headers.get("etag")).toBe("\"scene-etag\"");
+    await expect(sceneResponse.text()).resolves.toBe("scene-bytes");
+    expect(maskResponse.status).toBe(404);
+    expect(bucket.requests).toEqual(["scenes/level-public.webp"]);
   });
 
   it("rejects authenticated MVP routes without the session header", async () => {
@@ -232,7 +278,7 @@ describe("API routes", () => {
     expect(objects.puts.map((put) => put.kind)).toEqual(["scene", "mask"]);
     expect(objects.puts[0]?.file.type).toBe("image/webp");
     expect(objects.puts[1]?.file.type).toBe("image/png");
-    const sceneObjectKey = "scenes/" + objects.puts[0]?.levelId + ".png";
+    const sceneObjectKey = "scenes/" + objects.puts[0]?.levelId + ".webp";
     const maskObjectKey = "masks/" + objects.puts[1]?.levelId + ".png";
     expect(levels.created).toEqual([
       expect.objectContaining({

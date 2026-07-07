@@ -3,4 +3,5 @@ node_modules/
 dist/
 apps/*/dist/
 packages/*/dist/
+.wrangler/
 *.tsbuildinfo

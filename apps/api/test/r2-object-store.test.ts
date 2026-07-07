@@ -32,11 +32,21 @@ class FakeR2ObjectBody {
 }
 
 class FakeR2Bucket {
+  readonly puts: Array<{ key: string; file: ReadableStream; contentType: string | undefined }> = [];
+
   constructor(private readonly objects: Map<string, Uint8Array>) {}
 
   async get(key: string): Promise<R2ObjectBody | null> {
     const bytes = this.objects.get(key);
     return bytes ? (new FakeR2ObjectBody(bytes) as unknown as R2ObjectBody) : null;
+  }
+
+  async put(
+    key: string,
+    file: ReadableStream,
+    options?: { httpMetadata?: { contentType?: string } },
+  ): Promise<void> {
+    this.puts.push({ key, file, contentType: options?.httpMetadata?.contentType });
   }
 }
 
@@ -44,6 +54,21 @@ const makeStore = (objects: Map<string, Uint8Array>) =>
   new R2ObjectStore(new FakeR2Bucket(objects) as unknown as R2Bucket, "https://cdn.example.test");
 
 describe("R2ObjectStore", () => {
+  it("stores WebP scene assets with a WebP object key and metadata", async () => {
+    const bucket = new FakeR2Bucket(new Map());
+    const store = new R2ObjectStore(bucket as unknown as R2Bucket, "https://cdn.example.test");
+
+    await expect(store.putLevelAsset("scene", "level-webp", new File(["scene"], "scene.webp", { type: "image/webp" }))).resolves.toBe(
+      "scenes/level-webp.webp",
+    );
+    expect(bucket.puts).toEqual([
+      expect.objectContaining({
+        key: "scenes/level-webp.webp",
+        contentType: "image/webp",
+      }),
+    ]);
+  });
+
   it("accepts uploaded RGBA PNG mask files", async () => {
     const file = new File([blobPartFromBytes(decodeBase64(rgbaPngFixture))], "mask.png", { type: "image/png" });
 
