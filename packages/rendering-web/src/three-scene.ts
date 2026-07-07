@@ -1,18 +1,176 @@
+import {
+  AmbientLight,
+  Box3,
+  Color,
+  DirectionalLight,
+  Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  Object3D,
+  OrthographicCamera,
+  Scene,
+  Vector3,
+  WebGLRenderer,
+} from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+
 import { clearCanvas } from "./paint-surface";
 
 export type ChameleonSceneInput = {
   canvas: HTMLCanvasElement;
   maskCanvas: HTMLCanvasElement;
   poseId: string;
+  modelSrc?: string;
   rotation: number;
   color?: string;
   fixedDisplayHeightRatio?: number;
+  signal?: AbortSignal;
 };
 
-export function renderChameleonScene(input: ChameleonSceneInput): void {
+const modelCache = new Map<string, Promise<Object3D>>();
+
+export async function renderChameleonScene(input: ChameleonSceneInput): Promise<void> {
   clearCanvas(input.canvas);
   clearCanvas(input.maskCanvas);
 
+  const modelSrc = input.modelSrc;
+  if (modelSrc) {
+    try {
+      await renderModelScene({ ...input, modelSrc });
+      return;
+    } catch {
+      if (input.signal?.aborted) return;
+      renderFallbackSilhouette(input);
+      return;
+    }
+  }
+
+  renderFallbackSilhouette(input);
+}
+
+async function renderModelScene(input: ChameleonSceneInput & { modelSrc: string }): Promise<void> {
+  const loadedModel = await loadModel(input.modelSrc);
+  if (input.signal?.aborted) return;
+
+  const sceneCanvas = makeRenderCanvas(input.canvas);
+  const maskRenderCanvas = makeRenderCanvas(input.maskCanvas);
+  const sceneModel = cloneModel(loadedModel);
+  const maskModel = cloneModel(loadedModel);
+
+  const sceneRenderer = renderModelToCanvas(sceneCanvas, sceneModel, {
+    color: input.color ?? "#6f8f66",
+    heightRatio: input.fixedDisplayHeightRatio ?? 0.22,
+    mask: false,
+    rotation: input.rotation,
+  });
+  const maskRenderer = renderModelToCanvas(maskRenderCanvas, maskModel, {
+    color: "#ffffff",
+    heightRatio: input.fixedDisplayHeightRatio ?? 0.22,
+    mask: true,
+    rotation: input.rotation,
+  });
+
+  if (input.signal?.aborted) return;
+
+  get2dContext(input.canvas).drawImage(sceneCanvas, 0, 0, input.canvas.width, input.canvas.height);
+  get2dContext(input.maskCanvas).drawImage(maskRenderCanvas, 0, 0, input.maskCanvas.width, input.maskCanvas.height);
+  sceneRenderer.dispose();
+  maskRenderer.dispose();
+}
+
+function renderModelToCanvas(
+  canvas: HTMLCanvasElement,
+  model: Object3D,
+  options: DrawOptions,
+): WebGLRenderer {
+  const scene = new Scene();
+  const camera = makeCamera(canvas);
+
+  prepareModel(model, options);
+  scene.add(model);
+
+  if (!options.mask) {
+    const keyLight = new DirectionalLight("#fff8e8", 2.2);
+    keyLight.position.set(2.5, 3.5, 6);
+    scene.add(new AmbientLight("#ffffff", 1.8));
+    scene.add(keyLight);
+  }
+
+  const renderer = new WebGLRenderer({
+    alpha: true,
+    antialias: true,
+    canvas,
+    preserveDrawingBuffer: true,
+  });
+  renderer.setSize(canvas.width, canvas.height, false);
+  renderer.setClearColor(new Color("#000000"), 0);
+  renderer.render(scene, camera);
+
+  return renderer;
+}
+
+function makeCamera(canvas: HTMLCanvasElement): OrthographicCamera {
+  const aspect = canvas.width / canvas.height;
+  const viewHeight = 2;
+  const viewWidth = viewHeight * aspect;
+  const camera = new OrthographicCamera(-viewWidth / 2, viewWidth / 2, viewHeight / 2, -viewHeight / 2, 0.1, 100);
+  camera.position.set(0, 0, 10);
+  camera.lookAt(0, 0, 0);
+
+  return camera;
+}
+
+function prepareModel(model: Object3D, options: DrawOptions): void {
+  model.rotation.y = Math.PI / 2;
+  model.rotation.z = (options.rotation * Math.PI) / 180;
+  model.traverse((child: Object3D) => {
+    const mesh = child as Mesh;
+    if (!mesh.isMesh) return;
+
+    mesh.material = options.mask
+      ? new MeshBasicMaterial({ color: "#ffffff" })
+      : new MeshStandardMaterial({
+          color: options.color,
+          metalness: 0.05,
+          roughness: 0.68,
+        });
+  });
+
+  model.updateMatrixWorld(true);
+  const box = new Box3().setFromObject(model);
+  const center = box.getCenter(new Vector3());
+  const size = box.getSize(new Vector3());
+
+  const targetHeight = Math.max(0.08, options.heightRatio * 2);
+  const modelHeight = Math.max(size.y, 0.0001);
+  const scale = targetHeight / modelHeight;
+  model.scale.multiplyScalar(scale);
+  model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
+}
+
+async function loadModel(modelSrc: string): Promise<Object3D> {
+  const cached = modelCache.get(modelSrc);
+  if (cached) return cached;
+
+  const promise = new GLTFLoader().loadAsync(modelSrc).then((gltf) => gltf.scene);
+  modelCache.set(modelSrc, promise);
+
+  return promise;
+}
+
+function cloneModel(model: Object3D): Object3D {
+  return model.clone(true);
+}
+
+function makeRenderCanvas(reference: HTMLCanvasElement): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = reference.width;
+  canvas.height = reference.height;
+
+  return canvas;
+}
+
+function renderFallbackSilhouette(input: ChameleonSceneInput): void {
   const sceneCtx = get2dContext(input.canvas);
   const maskCtx = get2dContext(input.maskCanvas);
   const color = input.color ?? "#6f8f66";

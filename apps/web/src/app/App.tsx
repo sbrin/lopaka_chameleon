@@ -5,12 +5,12 @@ import { LopakaApiClient } from "../api/client";
 import { CreatorScreen } from "../create/CreatorScreen";
 import { PlayScreen } from "../play/PlayScreen";
 import { BrowserSessionStore } from "../platform/browser-session-store";
-import { defaultRoute, type AppRoute } from "./routes";
+import { routeFromPathname, type AppRoute } from "./routes";
 
 type SessionStatus = "checking" | "ready" | "offline";
 
 export function App() {
-  const [route, setRoute] = useState<AppRoute>(defaultRoute);
+  const [route, setRoute] = useState<AppRoute>(() => routeFromPathname(window.location.pathname));
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("checking");
   const sessionStore = useMemo(() => new BrowserSessionStore(), []);
   const apiClient = useMemo(

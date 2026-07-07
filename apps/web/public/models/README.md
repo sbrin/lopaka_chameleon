@@ -28,4 +28,4 @@ The source STL files are not committed here. The committed runtime asset was con
 assimp export /Users/sun/Downloads/AllPoses_stls/obj_2_Pose01.step.stl apps/web/public/models/chameleon-mvp.glb
 ```
 
-The app keeps working with the built-in shaded silhouette renderer until a later renderer task loads the GLB model directly.
+The creator renderer loads this GLB directly through Three.js. The built-in shaded silhouette is only a runtime fallback if the model fails to load or WebGL rendering fails.

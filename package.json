@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260706.1",
+    "@types/three": "^0.185.0",
     "@vitejs/plugin-react": "^5.0.0",
     "jsdom": "^29.1.1",
     "typescript": "^5.9.0",

@@ -124,6 +124,7 @@ export function CreatorScreen() {
     const chameleonCanvas = chameleonCanvasRef.current;
     const maskCanvas = maskCanvasRef.current;
     if (!chameleonCanvas || !maskCanvas) return;
+    const abortController = new AbortController();
 
     chameleonCanvas.width = imageWidth;
     chameleonCanvas.height = imageHeight;
@@ -137,21 +138,30 @@ export function CreatorScreen() {
       poseId: selectedPose?.id ?? "placeholder",
       rotation: state.rotation,
       color: CHAMELEON_BASE_COLOR,
+      signal: abortController.signal,
     };
 
-    renderChameleonScene(
+    void renderChameleonScene(
       selectedPose
         ? {
             ...renderInput,
+            modelSrc: selectedPose.modelSrc,
             fixedDisplayHeightRatio: selectedPose.fixedDisplayHeightRatio,
           }
         : renderInput,
-    );
-    compositePaintToSurface({
-      surfaceCanvas: chameleonCanvas,
-      paintCanvas,
-      maskCanvas,
+    ).then(() => {
+      if (abortController.signal.aborted) return;
+
+      compositePaintToSurface({
+        surfaceCanvas: chameleonCanvas,
+        paintCanvas,
+        maskCanvas,
+      });
     });
+
+    return () => {
+      abortController.abort();
+    };
   }, [imageHeight, imageWidth, selectedPose, state.rotation]);
 
   const saveLevel = useCallback(async () => {
