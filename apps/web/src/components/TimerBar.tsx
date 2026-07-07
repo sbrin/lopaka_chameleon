@@ -23,5 +23,5 @@ function formatTime(valueMs: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
 
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 }
