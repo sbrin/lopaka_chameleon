@@ -1,5 +1,5 @@
 import type { BackgroundAsset, PoseAsset } from "@lopaka/game-core";
-import { bakeScene, paintMaskedStroke, renderChameleonScene } from "@lopaka/rendering-web";
+import { bakeScene, compositePaintToSurface, paintStroke, renderChameleonScene } from "@lopaka/rendering-web";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { LopakaApiClient } from "../api/client";
@@ -24,6 +24,7 @@ export function CreatorScreen() {
   const backgroundCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const chameleonCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const paintCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const api = useMemo(
     () =>
@@ -128,6 +129,7 @@ export function CreatorScreen() {
     chameleonCanvas.height = imageHeight;
     maskCanvas.width = imageWidth;
     maskCanvas.height = imageHeight;
+    const paintCanvas = getPersistentPaintCanvas(paintCanvasRef, imageWidth, imageHeight);
 
     const renderInput = {
       canvas: chameleonCanvas,
@@ -145,6 +147,11 @@ export function CreatorScreen() {
           }
         : renderInput,
     );
+    compositePaintToSurface({
+      surfaceCanvas: chameleonCanvas,
+      paintCanvas,
+      maskCanvas,
+    });
   }, [imageHeight, imageWidth, selectedPose, state.rotation]);
 
   const saveLevel = useCallback(async () => {
@@ -199,17 +206,22 @@ export function CreatorScreen() {
       const canvas = chameleonCanvasRef.current;
       const maskCanvas = maskCanvasRef.current;
       if (!canvas || !maskCanvas) return;
+      const paintCanvas = getPersistentPaintCanvas(paintCanvasRef, canvas.width, canvas.height);
 
       const rect = canvas.getBoundingClientRect();
       const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
       const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
 
-      paintMaskedStroke({
-        canvas,
-        maskCanvas,
+      paintStroke({
+        canvas: paintCanvas,
         point: { x, y },
         color: state.color,
         brushSize: state.brushSize,
+      });
+      compositePaintToSurface({
+        surfaceCanvas: canvas,
+        paintCanvas,
+        maskCanvas,
       });
     },
     [state.brushSize, state.canPaint, state.color],
@@ -360,6 +372,22 @@ export function CreatorScreen() {
       </div>
     </div>
   );
+}
+
+function getPersistentPaintCanvas(
+  ref: React.MutableRefObject<HTMLCanvasElement | null>,
+  width: number,
+  height: number,
+): HTMLCanvasElement {
+  const canvas = ref.current ?? document.createElement("canvas");
+  ref.current = canvas;
+
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+
+  return canvas;
 }
 
 function drawBackgroundFallback(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, label: string): void {

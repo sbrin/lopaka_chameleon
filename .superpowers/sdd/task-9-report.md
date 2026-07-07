@@ -85,3 +85,76 @@ Final results:
 - The placeholder renderer is intentionally a 2D shaded silhouette. It keeps the replacement API narrow for Task 12, but it is not a real GLB/Three.js model yet.
 - Changing pose or rotation redraws the placeholder silhouette and mask, so existing paint strokes are not preserved across those changes. This keeps Task 9 simple and avoids adding a stroke-history model before the later rendering tasks.
 - I did not implement PlayScreen or play coordinate mapping.
+
+---
+
+## Review Fix: Preserve Paint Across Pose And Rotation Redraws
+
+## Status
+
+DONE
+
+## Summary
+
+- Added a persistent offscreen paint canvas in `CreatorScreen`.
+- Painting now records strokes onto the persistent paint canvas instead of directly mutating the rendered chameleon layer.
+- Pose/rotation redraws now render the current silhouette and mask, then composite persistent paint through the current mask.
+- The visible/saved scene still uses separate background, chameleon, and mask canvases; painting does not touch the background.
+- Added focused `paint-surface` tests for persistent paint recording and re-compositing through changed masks.
+
+## TDD Evidence
+
+### RED: Persistent Paint Helpers
+
+Command:
+
+```bash
+bun run --cwd packages/rendering-web test paint-surface
+```
+
+Result before implementation:
+
+- Failed as expected: `paintStroke is not a function`.
+- Failed as expected: `compositePaintToSurface is not a function`.
+
+### GREEN: Focused Regression
+
+Command:
+
+```bash
+bun run --cwd packages/rendering-web test paint-surface
+```
+
+Result after implementation:
+
+- 1 test file passed.
+- 2 tests passed.
+
+## Required Verification
+
+Commands:
+
+```bash
+bun run --cwd apps/web test creator-state
+bun run --cwd packages/rendering-web test
+bun run --cwd apps/web build
+bun run typecheck
+```
+
+Results:
+
+- `bun run --cwd apps/web test creator-state`: passed; 1 file, 4 tests.
+- `bun run --cwd packages/rendering-web test`: passed; 4 files, 5 tests.
+- `bun run --cwd apps/web build`: passed; Vite built 1597 modules and emitted `dist/index.html`, CSS, and JS assets.
+- `bun run typecheck`: passed; `tsc -b` exited successfully.
+
+## Files Changed
+
+- `apps/web/src/create/CreatorScreen.tsx`
+- `packages/rendering-web/src/paint-surface.ts`
+- `packages/rendering-web/test/paint-surface.test.ts`
+- `.superpowers/sdd/task-9-report.md`
+
+## Concerns
+
+- Persistent paint is stored in canvas/image coordinates and then clipped by the current mask after pose or rotation changes. This preserves painted pixels without adding model scaling, multiple models, or model-space paint projection.

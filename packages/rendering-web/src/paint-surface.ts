@@ -5,13 +5,22 @@ export type PaintPoint = {
 
 export type PaintStrokeInput = {
   canvas: HTMLCanvasElement;
-  maskCanvas: HTMLCanvasElement;
   point: PaintPoint;
   color: string;
   brushSize: number;
 };
 
-export function paintMaskedStroke(input: PaintStrokeInput): void {
+export type MaskedPaintStrokeInput = PaintStrokeInput & {
+  maskCanvas: HTMLCanvasElement;
+};
+
+export type CompositePaintInput = {
+  surfaceCanvas: HTMLCanvasElement;
+  paintCanvas: HTMLCanvasElement;
+  maskCanvas: HTMLCanvasElement;
+};
+
+export function paintStroke(input: PaintStrokeInput): void {
   const ctx = get2dContext(input.canvas);
   ctx.save();
   ctx.fillStyle = input.color;
@@ -19,8 +28,22 @@ export function paintMaskedStroke(input: PaintStrokeInput): void {
   ctx.arc(input.point.x, input.point.y, input.brushSize / 2, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+}
 
+export function paintMaskedStroke(input: MaskedPaintStrokeInput): void {
+  paintStroke(input);
   clipCanvasToMask(input.canvas, input.maskCanvas);
+}
+
+export function compositePaintToSurface(input: CompositePaintInput): void {
+  const ctx = get2dContext(input.surfaceCanvas);
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.drawImage(input.paintCanvas, 0, 0, input.surfaceCanvas.width, input.surfaceCanvas.height);
+  ctx.globalCompositeOperation = "destination-in";
+  ctx.drawImage(input.maskCanvas, 0, 0, input.surfaceCanvas.width, input.surfaceCanvas.height);
+  ctx.restore();
+  ctx.globalCompositeOperation = "source-over";
 }
 
 export function clipCanvasToMask(canvas: HTMLCanvasElement, maskCanvas: HTMLCanvasElement): void {
